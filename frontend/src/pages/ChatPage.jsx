@@ -6,7 +6,7 @@ import SessionSidebar from '../components/Sidebar/SessionSidebar.jsx'
 import ErrorBanner from '../components/UI/ErrorBanner.jsx'
 import { useChat } from '../hooks/useChat.js'
 
-export default function ChatPage({ onBackToHome, initialPrompt, theme, onToggleTheme }) {
+export default function ChatPage({ onBackToHome, initialPrompt, theme, onToggleTheme, isGuestRoute }) {
   const chat = useChat()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -42,6 +42,7 @@ export default function ChatPage({ onBackToHome, initialPrompt, theme, onToggleT
           onToggleSidebar={() => setSidebarOpen(true)}
           onNewChat={handleNewChat}
           onBackToHome={onBackToHome}
+          isGuestRoute={isGuestRoute}
         />
         <ErrorBanner message={chat.error} onDismiss={chat.clearError} />
         <ChatWindow messages={chat.messages} loading={chat.loading} onSelectPrompt={chat.send} />

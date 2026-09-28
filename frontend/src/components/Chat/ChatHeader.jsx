@@ -1,7 +1,14 @@
-import { Menu, Sun, Moon, ArrowLeft, LogIn, User, LogOut } from 'lucide-react'
+import { Menu, Sun, Moon, ArrowLeft, LogIn, LogOut, UserCircle2 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 
-export default function ChatHeader({ theme, onToggleTheme, onToggleSidebar, onNewChat, onBackToHome }) {
+export default function ChatHeader({
+  theme,
+  onToggleTheme,
+  onToggleSidebar,
+  onNewChat,
+  onBackToHome,
+  isGuestRoute,
+}) {
   const isDark = theme === 'dark'
   const { user, openAuthModal, logout } = useAuth()
 
@@ -54,15 +61,21 @@ export default function ChatHeader({ theme, onToggleTheme, onToggleSidebar, onNe
             </button>
           </div>
         ) : (
-          <button
-            type="button"
-            className="header-signin-btn"
-            onClick={() => openAuthModal('login')}
-            title="Sign in to save private chat history"
-          >
-            <LogIn size={15} />
-            <span className="header-signin-text">Sign In</span>
-          </button>
+          <div className="header-guest-wrap">
+            <div className="header-guest-chip" title="You are chatting in isolated Guest Mode. Your chat will not be saved across browsers or tabs.">
+              <UserCircle2 size={15} />
+              <span>Guest Mode</span>
+            </div>
+            <button
+              type="button"
+              className="header-signin-btn"
+              onClick={() => openAuthModal('login')}
+              title="Sign in to save private chat history"
+            >
+              <LogIn size={15} />
+              <span className="header-signin-text">Sign In</span>
+            </button>
+          </div>
         )}
 
         <button
