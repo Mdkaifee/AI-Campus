@@ -35,3 +35,4 @@ class ChatTurn:
     created_at: datetime = field(default_factory=utc_now)
     provider: Optional[str] = None
     model: Optional[str] = None
+    user_email: Optional[str] = None

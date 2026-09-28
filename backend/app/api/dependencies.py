@@ -1,6 +1,7 @@
 """Shared FastAPI dependencies."""
 
 from functools import lru_cache
+from typing import Optional
 
 from fastapi import Request
 from motor.motor_asyncio import AsyncIOMotorDatabase
