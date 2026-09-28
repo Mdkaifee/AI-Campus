@@ -3,7 +3,7 @@ services:
   # Backend: FastAPI Web Service
   # -------------------------------------------------------------
   - type: web
-    name: smart-campus-backend
+    name: daviet-ai-campus-backend
     runtime: python
     plan: free
     rootDir: backend
@@ -17,7 +17,7 @@ services:
       - key: MONGODB_URI
         sync: false # Paste your MongoDB Atlas URI in Render dashboard
       - key: CORS_ORIGINS
-        sync: false # Set to your Render Frontend URL, e.g. https://smart-campus-frontend.onrender.com
+        sync: false # Set to your Render Frontend URL, e.g. https://daviet-ai-campus-frontend.onrender.com
       - key: AI_PROVIDER
         value: openai # Cloud LLM (Groq / Gemini / OpenAI)
       - key: OLLAMA_BASE_URL
@@ -33,7 +33,7 @@ services:
   # Frontend: React / Vite Static Site
   # -------------------------------------------------------------
   - type: web
-    name: smart-campus-frontend
+    name: daviet-ai-campus-frontend
     runtime: static
     rootDir: frontend
     buildCommand: npm install && npm run build
@@ -44,4 +44,4 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_BASE_URL
-        sync: false # Set to your Render Backend URL, e.g. https://smart-campus-backend.onrender.com
+        sync: false # Set to your Render Backend URL, e.g. https://daviet-ai-campus-backend.onrender.com
