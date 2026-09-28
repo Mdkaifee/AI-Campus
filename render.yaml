@@ -19,13 +19,13 @@ services:
       - key: CORS_ORIGINS
         sync: false # Set to your Render Frontend URL, e.g. https://daviet-ai-campus-frontend.onrender.com
       - key: AI_PROVIDER
-        value: openai # Cloud LLM (Groq / Gemini / OpenAI)
+        value: openai # Cloud Gemini Provider
       - key: OLLAMA_BASE_URL
-        value: https://api.groq.com/openai/v1 # Or https://generativelanguage.googleapis.com
+        value: https://generativelanguage.googleapis.com
       - key: AI_MODEL
-        value: llama-3.3-70b-versatile # Or gemini-1.5-flash / gpt-4o-mini
+        value: gemini-2.0-flash
       - key: AI_API_KEY
-        sync: false # Paste your Cloud AI API Key in Render dashboard
+        sync: false # Paste your Gemini API Key in Render dashboard
       - key: LOG_LEVEL
         value: INFO
 
