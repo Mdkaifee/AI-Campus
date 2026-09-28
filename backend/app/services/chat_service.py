@@ -60,7 +60,7 @@ class ChatService:
         self._location_service = location_service or LocationService()
         self._web_retrieval = web_retrieval_service or WebRetrievalService()
 
-    async def ask(self, message: str, session_id: Optional[str] = None) -> ChatTurn:
+    async def ask(self, message: str, session_id: Optional[str] = None, user_email: Optional[str] = None) -> ChatTurn:
         session = session_id.strip() if session_id and session_id.strip() else str(uuid.uuid4())
 
         if _is_greeting(message):
@@ -72,12 +72,13 @@ class ChatService:
                 location=None,
                 provider="rules",
                 model="greeting",
+                user_email=user_email,
             )
             await self._safe_save_turn(turn)
             return turn
 
         # Load recent conversational history to preserve multi-turn context
-        recent = await self._safe_recent_turns(session)
+        recent = await self._safe_recent_turns(session, user_email=user_email)
         conversation = [
             (turn.user_message, turn.assistant_message) for turn in recent[-4:]
         ]
@@ -126,11 +127,12 @@ class ChatService:
             location=location_data,
             provider=provider,
             model=model,
+            user_email=user_email,
         )
         await self._safe_save_turn(turn)
         return turn
 
-    async def ask_stream(self, message: str, session_id: Optional[str] = None):
+    async def ask_stream(self, message: str, session_id: Optional[str] = None, user_email: Optional[str] = None):
         session = session_id.strip() if session_id and session_id.strip() else str(uuid.uuid4())
 
         import json
@@ -152,12 +154,13 @@ class ChatService:
                 location=None,
                 provider="rules",
                 model="greeting",
+                user_email=user_email,
             )
             await self._safe_save_turn(turn)
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
             return
 
-        recent = await self._safe_recent_turns(session)
+        recent = await self._safe_recent_turns(session, user_email=user_email)
         conversation = [
             (turn.user_message, turn.assistant_message) for turn in recent[-4:]
         ]
@@ -187,7 +190,6 @@ class ChatService:
             for item in context
         ]
 
-        import json
         metadata_event = {
             "type": "metadata",
             "session_id": session,
@@ -211,6 +213,7 @@ class ChatService:
                 location=None,
                 provider="rules",
                 model="fallback",
+                user_email=user_email,
             )
             await self._safe_save_turn(turn)
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
@@ -246,21 +249,22 @@ class ChatService:
             sources=sources if context else [],
             location=location_data,
             provider=getattr(self._ai._provider, "__class__", {}).__name__ if hasattr(self._ai, "_provider") else "ai",
-            model=getattr(self._ai._provider, "_model", "gemini-3.8-flash"),
+            model=getattr(self._ai._provider, "_model", "claude-haiku-4-5-20251001"),
+            user_email=user_email,
         )
         await self._safe_save_turn(turn)
 
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
 
-    async def history(self, session_id: str) -> List[ChatTurn]:
-        return await self._chat_repo.list_turns(session_id)
+    async def history(self, session_id: str, *, user_email: Optional[str] = None) -> List[ChatTurn]:
+        return await self._chat_repo.list_turns(session_id, user_email=user_email)
 
-    async def sessions(self):
-        return await self._chat_repo.list_sessions()
+    async def sessions(self, *, user_email: Optional[str] = None):
+        return await self._chat_repo.list_sessions(user_email=user_email)
 
-    async def delete_session(self, session_id: str) -> bool:
-        return await self._chat_repo.delete_session(session_id)
+    async def delete_session(self, session_id: str, *, user_email: Optional[str] = None) -> bool:
+        return await self._chat_repo.delete_session(session_id, user_email=user_email)
 
     async def _generate_answer(
         self,
