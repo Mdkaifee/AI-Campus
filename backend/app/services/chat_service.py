@@ -318,9 +318,9 @@ class ChatService:
                 return f"**{location_data.get('name')}** is located in **{location_data.get('block', 'Main Campus')}** ({location_data.get('floor', 'Ground Floor')}). {location_data.get('description', '')}", "campus_map", "location_service"
             return AI_UNAVAILABLE_ANSWER, None, None
 
-    async def _safe_recent_turns(self, session_id: str) -> List[ChatTurn]:
+    async def _safe_recent_turns(self, session_id: str, user_email: Optional[str] = None) -> List[ChatTurn]:
         try:
-            return await self._chat_repo.list_recent_turns(session_id, limit=4)
+            return await self._chat_repo.list_recent_turns(session_id, user_email=user_email, limit=4)
         except Exception as exc:  # noqa: BLE001
             logger.warning("Failed to load recent turns: %s", type(exc).__name__)
             await self._audit_repo.record(

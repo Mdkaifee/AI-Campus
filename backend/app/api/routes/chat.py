@@ -1,10 +1,10 @@
-"""Chat API — frontend talks only to this layer."""
+"""Chat API — frontend talks only to this layer with user privacy isolation."""
 
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.api.dependencies import get_chat_service
+from app.api.dependencies import get_chat_service, get_current_user_email
 from app.schemas.chat import (
     ChatHistoryResponse,
     ChatRequest,
@@ -24,15 +24,16 @@ router = APIRouter(prefix="/chat", tags=["chat"])
     status_code=status.HTTP_200_OK,
     summary="Ask the DAVIET assistant",
     description=(
-        "Retrieves verified DAVIET knowledge, then asks Ollama to draft a student-friendly answer. "
+        "Retrieves verified DAVIET knowledge, then asks AI to draft a student-friendly answer. "
         "The model is not allowed to invent college facts."
     ),
 )
 async def create_chat(
     payload: ChatRequest,
     service: ChatService = Depends(get_chat_service),
+    user_email: Optional[str] = Depends(get_current_user_email),
 ) -> ChatResponse:
-    turn = await service.ask(payload.message, payload.session_id)
+    turn = await service.ask(payload.message, payload.session_id, user_email=user_email)
     unavailable = not turn.sources and not turn.location
     return ChatResponse(
         session_id=turn.session_id,
@@ -58,10 +59,11 @@ async def create_chat(
 async def create_chat_stream(
     payload: ChatRequest,
     service: ChatService = Depends(get_chat_service),
+    user_email: Optional[str] = Depends(get_current_user_email),
 ):
     from fastapi.responses import StreamingResponse
     return StreamingResponse(
-        service.ask_stream(payload.message, payload.session_id),
+        service.ask_stream(payload.message, payload.session_id, user_email=user_email),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -71,16 +73,16 @@ async def create_chat_stream(
     )
 
 
-
 @router.get(
     "/sessions",
     response_model=List[ChatSessionResponse],
-    summary="List recent chat sessions",
+    summary="List recent chat sessions for the authenticated user",
 )
 async def list_sessions(
     service: ChatService = Depends(get_chat_service),
+    user_email: Optional[str] = Depends(get_current_user_email),
 ) -> List[ChatSessionResponse]:
-    rows = await service.sessions()
+    rows = await service.sessions(user_email=user_email)
     return [ChatSessionResponse(**row) for row in rows]
 
 
@@ -92,10 +94,11 @@ async def list_sessions(
 async def get_session(
     session_id: str,
     service: ChatService = Depends(get_chat_service),
+    user_email: Optional[str] = Depends(get_current_user_email),
 ) -> ChatHistoryResponse:
     if not session_id.strip():
         raise HTTPException(status_code=400, detail="Please enter a question.")
-    turns = await service.history(session_id)
+    turns = await service.history(session_id, user_email=user_email)
     return ChatHistoryResponse(
         session_id=session_id,
         turns=[
@@ -126,8 +129,9 @@ async def get_session(
 async def delete_session(
     session_id: str,
     service: ChatService = Depends(get_chat_service),
+    user_email: Optional[str] = Depends(get_current_user_email),
 ) -> dict:
     if not session_id.strip():
         raise HTTPException(status_code=400, detail="Invalid session ID.")
-    success = await service.delete_session(session_id)
+    success = await service.delete_session(session_id, user_email=user_email)
     return {"ok": success, "session_id": session_id}

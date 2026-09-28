@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routes import chat, health
+from app.api.routes import auth, chat, health
 from app.core.config import get_settings
 from app.core.logging import get_logger, setup_logging
 from app.database.mongodb import (
@@ -17,6 +17,7 @@ from app.database.mongodb import (
 from app.repositories.chat_repository import ChatRepository
 from app.repositories.error_audit_repository import ErrorAuditRepository
 from app.services.ai_service import AIService
+from app.services.auth_service import AuthService
 from app.services.chat_service import ChatService
 from app.services.location_service import LocationService
 from app.services.retrieval_service import RetrievalService
@@ -55,6 +56,7 @@ async def lifespan(app: FastAPI):
         except Exception:
             logger.warning("Could not sync dynamic catalog or locations to MongoDB")
 
+    app.state.auth_service = AuthService(db)
     retrieval = RetrievalService(dynamic_items=VERIFIED_DYNAMIC_CATALOG)
     app.state.chat_service = ChatService(
         retrieval=retrieval,
@@ -103,6 +105,7 @@ def create_app() -> FastAPI:
             "health": "/api/health",
         }
 
+    app.include_router(auth.router, prefix="/api")
     app.include_router(health.router, prefix="/api")
     app.include_router(chat.router, prefix="/api")
 

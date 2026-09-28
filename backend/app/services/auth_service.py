@@ -10,9 +10,10 @@ import secrets
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, TYPE_CHECKING
 
-from motor.motor_asyncio import AsyncIOMotorDatabase
+if TYPE_CHECKING:
+    from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
