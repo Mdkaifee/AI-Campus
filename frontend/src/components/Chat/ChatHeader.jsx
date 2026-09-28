@@ -1,11 +1,24 @@
-import { Menu, Sun, Moon } from 'lucide-react'
+import { Menu, Sun, Moon, ArrowLeft } from 'lucide-react'
 
-export default function ChatHeader({ theme, onToggleTheme, onToggleSidebar, onNewChat }) {
+export default function ChatHeader({ theme, onToggleTheme, onToggleSidebar, onNewChat, onBackToHome }) {
   const isDark = theme === 'dark'
 
   return (
     <header className="chat-header">
       <div className="chat-header__left">
+        {onBackToHome && (
+          <button
+            type="button"
+            className="header-home-btn"
+            onClick={onBackToHome}
+            aria-label="Back to Campus Portal"
+            title="Back to Campus Portal Home"
+          >
+            <ArrowLeft size={18} strokeWidth={2.2} />
+            <span className="header-home-text">Portal Home</span>
+          </button>
+        )}
+
         <button
           type="button"
           className="header-drawer-btn"

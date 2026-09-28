@@ -6,21 +6,16 @@ import SessionSidebar from '../components/Sidebar/SessionSidebar.jsx'
 import ErrorBanner from '../components/UI/ErrorBanner.jsx'
 import { useChat } from '../hooks/useChat.js'
 
-export default function ChatPage() {
+export default function ChatPage({ onBackToHome, initialPrompt, theme, onToggleTheme }) {
   const chat = useChat()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('daviet_theme') || 'light'
-  })
 
+  // If launched with a prompt from landing page, send it automatically
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-    localStorage.setItem('daviet_theme', theme)
-  }, [theme])
-
-  function toggleTheme() {
-    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))
-  }
+    if (initialPrompt && chat.messages.length === 0 && !chat.loading) {
+      chat.send(initialPrompt)
+    }
+  }, [initialPrompt])
 
   function handleNewChat() {
     chat.startNewChat()
@@ -43,9 +38,10 @@ export default function ChatPage() {
       <section className="app-main">
         <ChatHeader
           theme={theme}
-          onToggleTheme={toggleTheme}
+          onToggleTheme={onToggleTheme}
           onToggleSidebar={() => setSidebarOpen(true)}
           onNewChat={handleNewChat}
+          onBackToHome={onBackToHome}
         />
         <ErrorBanner message={chat.error} onDismiss={chat.clearError} />
         <ChatWindow messages={chat.messages} loading={chat.loading} onSelectPrompt={chat.send} />
