@@ -2042,7 +2042,8 @@ html, body, #root {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: 1.25rem 1rem;
+  overflow-y: auto;
   animation: authFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -2054,13 +2055,34 @@ html, body, #root {
 .auth-modal-card {
   position: relative;
   width: 100%;
-  max-width: 440px;
+  max-width: 460px;
+  max-height: calc(100vh - 2.5rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--card-bg, #ffffff);
   border: 1px solid var(--card-border, rgba(0, 0, 0, 0.08));
   border-radius: var(--radius-lg, 20px);
   padding: 2.25rem 2rem 2rem;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
   animation: authScaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  margin: auto;
+}
+
+.auth-modal-card::-webkit-scrollbar {
+  width: 6px;
+}
+
+.auth-modal-card::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.auth-modal-card::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.25);
+  border-radius: 9999px;
+}
+
+.auth-modal-card::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.45);
 }
 
 @keyframes authScaleUp {
