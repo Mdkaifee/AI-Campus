@@ -1,4 +1,4 @@
-"""Persist chat turns in MongoDB without storing extra personal data."""
+"""Persist chat turns in MongoDB with per-user privacy isolation."""
 
 from __future__ import annotations
 
@@ -35,6 +35,7 @@ class ChatRepository:
 
         document = {
             "session_id": turn.session_id,
+            "user_email": turn.user_email,
             "user_message": turn.user_message,
             "assistant_message": turn.assistant_message,
             "created_at": turn.created_at,
@@ -45,13 +46,17 @@ class ChatRepository:
         }
         await collection.insert_one(document)
 
-    async def list_turns(self, session_id: str, *, limit: int = 50) -> List[ChatTurn]:
+    async def list_turns(self, session_id: str, *, user_email: Optional[str] = None, limit: int = 50) -> List[ChatTurn]:
         collection = self._collection()
         if collection is None:
             return []
 
+        query: Dict[str, Any] = {"session_id": session_id}
+        if user_email:
+            query["user_email"] = user_email
+
         cursor = (
-            collection.find({"session_id": session_id})
+            collection.find(query)
             .sort("created_at", 1)
             .limit(limit)
         )
@@ -60,13 +65,17 @@ class ChatRepository:
             turns.append(self._to_turn(row))
         return turns
 
-    async def list_recent_turns(self, session_id: str, *, limit: int = 4) -> List[ChatTurn]:
+    async def list_recent_turns(self, session_id: str, *, user_email: Optional[str] = None, limit: int = 4) -> List[ChatTurn]:
         collection = self._collection()
         if collection is None:
             return []
 
+        query: Dict[str, Any] = {"session_id": session_id}
+        if user_email:
+            query["user_email"] = user_email
+
         cursor = (
-            collection.find({"session_id": session_id})
+            collection.find(query)
             .sort("created_at", -1)
             .limit(limit)
         )
@@ -74,12 +83,18 @@ class ChatRepository:
         rows.reverse()
         return rows
 
-    async def list_sessions(self, *, limit: int = 30) -> List[Dict[str, Any]]:
+    async def list_sessions(self, *, user_email: Optional[str] = None, limit: int = 30) -> List[Dict[str, Any]]:
         collection = self._collection()
         if collection is None:
             return []
 
-        pipeline = [
+        pipeline: List[Dict[str, Any]] = []
+        if user_email:
+            pipeline.append({"$match": {"user_email": user_email}})
+        else:
+            pipeline.append({"$match": {"user_email": None}})
+
+        pipeline.extend([
             {"$sort": {"created_at": 1}},
             {
                 "$group": {
@@ -91,7 +106,8 @@ class ChatRepository:
             },
             {"$sort": {"updated_at": -1}},
             {"$limit": limit},
-        ]
+        ])
+
         sessions: List[Dict[str, Any]] = []
         async for row in collection.aggregate(pipeline):
             sessions.append(
@@ -104,11 +120,16 @@ class ChatRepository:
             )
         return sessions
 
-    async def delete_session(self, session_id: str) -> bool:
+    async def delete_session(self, session_id: str, *, user_email: Optional[str] = None) -> bool:
         collection = self._collection()
         if collection is None:
             return False
-        result = await collection.delete_many({"session_id": session_id})
+
+        query: Dict[str, Any] = {"session_id": session_id}
+        if user_email:
+            query["user_email"] = user_email
+
+        result = await collection.delete_many(query)
         return result.deleted_count > 0
 
     def _to_turn(self, row: Dict[str, Any]) -> ChatTurn:
@@ -133,4 +154,5 @@ class ChatRepository:
             created_at=row.get("created_at") or datetime.utcnow(),
             provider=row.get("provider"),
             model=row.get("model"),
+            user_email=row.get("user_email"),
         )
