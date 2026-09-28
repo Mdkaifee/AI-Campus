@@ -185,7 +185,7 @@ export default function AuthModal() {
                   id="auth-name"
                   type="text"
                   className="auth-input"
-                  placeholder="e.g. Kaifee"
+                  placeholder="e.g. Enter your name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   disabled={submitting}
