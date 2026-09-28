@@ -603,6 +603,149 @@ class OpenAICompatibleAIService:
 
 
 
+class AnthropicClaudeAIService:
+    """Native Anthropic Claude generation service."""
+
+    def __init__(
+        self,
+        *,
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
+        timeout_seconds: Optional[float] = None,
+        client: Optional[httpx.AsyncClient] = None,
+    ) -> None:
+        settings = get_settings()
+        self._api_key = api_key or settings.ai_api_key
+        self._model = model or settings.ai_model or "claude-haiku-4-5-20251001"
+        self._timeout = timeout_seconds or settings.ai_timeout_seconds
+        self._client = client
+
+    async def generate_response(
+        self,
+        question: str,
+        context: Sequence[KnowledgeItem],
+        conversation: Optional[Sequence[tuple[str, str]]] = None,
+        location_meta: Optional[dict] = None,
+    ) -> AIResult:
+        from datetime import datetime, timezone, timedelta
+        ist_tz = timezone(timedelta(hours=5, minutes=30))
+        current_time_str = datetime.now(ist_tz).strftime("%A, %d %B %Y %I:%M %p IST")
+
+        current_system_prompt = load_system_prompt()
+        headers = {
+            "x-api-key": self._api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        }
+        payload = {
+            "model": self._model,
+            "max_tokens": 1024,
+            "system": current_system_prompt,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": (
+                        f"[Current Live Campus Local Time]: {current_time_str}\n\n"
+                        f"Verified DAVIET Campus Context:\n{_format_context(context, location_meta)}\n\n"
+                        f"Recent Conversation History:\n{_format_conversation(conversation)}\n\n"
+                        f"Student Question: {question}\n\n"
+                        "Respond naturally, authoritatively, and helpfully as DAVIET Campus AI:"
+                    ),
+                }
+            ],
+        }
+        url = "https://api.anthropic.com/v1/messages"
+
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                response = await client.post(url, json=payload, headers=headers)
+            if response.status_code >= 400:
+                logger.error("Claude status=%s model=%s: %s", response.status_code, self._model, response.text)
+                raise AIProviderError(f"status_{response.status_code}")
+            data = response.json()
+            content_list = data.get("content") or []
+            answer = (content_list[0].get("text") or "").strip() if content_list else ""
+            if not answer:
+                raise AIProviderError("empty_response")
+            return AIResult(
+                answer=answer,
+                provider="anthropic_claude",
+                model=self._model,
+                attempts=1,
+            )
+        except AIProviderError:
+            raise
+        except Exception as exc:
+            logger.error("Claude generate error: %s", type(exc).__name__)
+            raise AIProviderError("claude_failed") from exc
+
+    async def generate_stream(
+        self,
+        question: str,
+        context: Sequence[KnowledgeItem],
+        conversation: Optional[Sequence[tuple[str, str]]] = None,
+        location_meta: Optional[dict] = None,
+    ):
+        from datetime import datetime, timezone, timedelta
+        ist_tz = timezone(timedelta(hours=5, minutes=30))
+        current_time_str = datetime.now(ist_tz).strftime("%A, %d %B %Y %I:%M %p IST")
+
+        current_system_prompt = load_system_prompt()
+        headers = {
+            "x-api-key": self._api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        }
+        payload = {
+            "model": self._model,
+            "max_tokens": 1024,
+            "system": current_system_prompt,
+            "stream": True,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": (
+                        f"[Current Live Campus Local Time]: {current_time_str}\n\n"
+                        f"Verified DAVIET Campus Context:\n{_format_context(context, location_meta)}\n\n"
+                        f"Recent Conversation History:\n{_format_conversation(conversation)}\n\n"
+                        f"Student Question: {question}\n\n"
+                        "Respond naturally, authoritatively, and helpfully as DAVIET Campus AI:"
+                    ),
+                }
+            ],
+        }
+        url = "https://api.anthropic.com/v1/messages"
+
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                async with client.stream("POST", url, json=payload, headers=headers) as response:
+                    if response.status_code >= 400:
+                        err_text = await response.aread()
+                        logger.error("Claude stream status=%s: %s", response.status_code, err_text.decode("utf-8", errors="ignore"))
+                        raise AIProviderError(f"status_{response.status_code}")
+                    import json
+                    async for line in response.aiter_lines():
+                        if line and line.startswith("data: "):
+                            raw_data = line[6:].strip()
+                            if raw_data == "[DONE]":
+                                break
+                            try:
+                                event = json.loads(raw_data)
+                                if event.get("type") == "content_block_delta":
+                                    delta = event.get("delta") or {}
+                                    if delta.get("type") == "text_delta":
+                                        tok = delta.get("text") or ""
+                                        if tok:
+                                            yield tok
+                            except ValueError:
+                                continue
+        except AIProviderError:
+            raise
+        except Exception as exc:
+            logger.error("Claude streaming error: %s", type(exc).__name__)
+            raise AIProviderError("stream_failed") from exc
+
+
 class AIService:
     """Provider-agnostic wrapper used by ChatService."""
 
@@ -612,7 +755,13 @@ class AIService:
             return
 
         settings = get_settings()
-        if settings.ai_provider in {"openai", "cloud", "openai_compatible"}:
+        if (
+            settings.ai_provider in {"anthropic", "claude"}
+            or (settings.ai_api_key and settings.ai_api_key.startswith("sk-ant-"))
+            or ("claude" in (settings.ai_model or "").lower())
+        ):
+            self._provider = AnthropicClaudeAIService()
+        elif settings.ai_provider in {"openai", "cloud", "openai_compatible"}:
             self._provider = OpenAICompatibleAIService()
         else:
             self._provider = OllamaAIService()
