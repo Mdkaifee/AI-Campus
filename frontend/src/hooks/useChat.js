@@ -1,13 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { deleteSession, getSession, listSessions, sendMessageStream } from '../services/api'
-import { getStoredSessionId, storeSessionId } from '../utils/session'
+import {
+  getStoredSessionId,
+  storeSessionId,
+  getStoredGuestSessions,
+  saveStoredGuestSessions,
+  getStoredGuestMessages,
+  storeGuestMessages,
+  deleteStoredGuestSession,
+} from '../utils/session'
 import { useAuth } from '../context/AuthContext'
 
 export function useChat() {
   const { user, token } = useAuth()
   const [sessionId, setSessionId] = useState(() => getStoredSessionId())
   const [messages, setMessages] = useState([])
-  const [sessions, setSessions] = useState([])
+  const [sessions, setSessions] = useState(() => {
+    return user ? [] : getStoredGuestSessions()
+  })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [sessionsLoading, setSessionsLoading] = useState(false)
@@ -26,7 +36,7 @@ export function useChat() {
 
   const refreshSessions = useCallback(async () => {
     if (!user) {
-      setSessions([])
+      setSessions(getStoredGuestSessions())
       return
     }
     setSessionsLoading(true)
@@ -52,6 +62,18 @@ export function useChat() {
       setError('')
       setLoading(true)
 
+      // In guest mode, check tab session storage first for instant load
+      if (!user) {
+        const cached = getStoredGuestMessages(id)
+        if (cached && cached.length > 0) {
+          setSessionId(id)
+          storeSessionId(id)
+          setMessages(cached)
+          setLoading(false)
+          return
+        }
+      }
+
       try {
         const history = await getSession(id, { signal: controller.signal })
 
@@ -71,6 +93,9 @@ export function useChat() {
         setSessionId(id)
         storeSessionId(id)
         setMessages(nextMessages)
+        if (!user) {
+          storeGuestMessages(id, nextMessages)
+        }
       } catch (err) {
         if (err.name === 'AbortError') return
         if (activeTargetIdRef.current === id) {
@@ -82,7 +107,7 @@ export function useChat() {
         }
       }
     },
-    [cancelActiveRequest],
+    [cancelActiveRequest, user],
   )
 
   const startNewChat = useCallback(() => {
@@ -101,9 +126,14 @@ export function useChat() {
     startNewChat()
 
     if (!user) {
-      // Guest mode: zero persistent history across browsers / profiles
-      setSessions([])
+      // Load tab-scoped guest sessions
+      const guestList = getStoredGuestSessions()
+      setSessions(guestList)
       setSessionsLoading(false)
+      const currentGuestId = getStoredSessionId()
+      if (currentGuestId && guestList.some((s) => s.session_id === currentGuestId)) {
+        loadSession(currentGuestId)
+      }
       return
     }
 
@@ -133,6 +163,15 @@ export function useChat() {
     async (id, event) => {
       event?.stopPropagation?.()
       try {
+        if (!user) {
+          deleteStoredGuestSession(id)
+          if (sessionId === id || activeTargetIdRef.current === id) {
+            startNewChat()
+          }
+          setSessions((prev) => prev.filter((s) => s.session_id !== id))
+          return
+        }
+
         await deleteSession(id)
         if (sessionId === id || activeTargetIdRef.current === id) {
           startNewChat()
@@ -142,7 +181,7 @@ export function useChat() {
         setError('Failed to delete chat session.')
       }
     },
-    [sessionId, startNewChat],
+    [sessionId, startNewChat, user],
   )
 
   const send = useCallback(
@@ -158,11 +197,16 @@ export function useChat() {
       activeTargetIdRef.current = currentSessionId
 
       setError('')
-      setMessages((current) => [...current, { role: 'user', content: trimmed }])
+      const userMessageObj = { role: 'user', content: trimmed }
+      setMessages((current) => [...current, userMessageObj])
       setLoading(true)
 
       try {
         let streamStarted = false
+        let finalSessionId = currentSessionId
+        let accumulatedAssistant = ''
+        let accumulatedSources = []
+        let accumulatedLocation = null
 
         await sendMessageStream(
           {
@@ -178,9 +222,13 @@ export function useChat() {
                 return
               }
 
+              finalSessionId = meta.session_id
               activeTargetIdRef.current = meta.session_id
               setSessionId(meta.session_id)
               storeSessionId(meta.session_id)
+
+              accumulatedSources = meta.sources || []
+              accumulatedLocation = meta.location || null
 
               if (!streamStarted) {
                 streamStarted = true
@@ -189,13 +237,40 @@ export function useChat() {
                   {
                     role: 'assistant',
                     content: '',
-                    sources: meta.sources || [],
-                    location: meta.location || null,
+                    sources: accumulatedSources,
+                    location: accumulatedLocation,
                   },
                 ])
               }
+
+              // Update guest session sidebar list immediately so "hi" shows right away!
+              if (!user) {
+                setSessions((prev) => {
+                  const existingIndex = prev.findIndex((s) => s.session_id === meta.session_id)
+                  let updated
+                  if (existingIndex >= 0) {
+                    updated = [...prev]
+                    updated[existingIndex] = {
+                      ...updated[existingIndex],
+                      updated_at: new Date().toISOString(),
+                    }
+                  } else {
+                    const titleText = trimmed.length > 32 ? trimmed.slice(0, 32) + '…' : trimmed
+                    const newEntry = {
+                      session_id: meta.session_id,
+                      title: titleText,
+                      updated_at: new Date().toISOString(),
+                      message_count: 1,
+                    }
+                    updated = [newEntry, ...prev]
+                  }
+                  saveStoredGuestSessions(updated)
+                  return updated
+                })
+              }
             },
             onToken: (tokenChunk) => {
+              accumulatedAssistant += tokenChunk
               setMessages((current) => {
                 if (current.length === 0) return current
                 const lastIdx = current.length - 1
@@ -212,6 +287,14 @@ export function useChat() {
           },
           { signal: controller.signal },
         )
+
+        // Save complete message turn to tab session storage for guest
+        if (!user && finalSessionId) {
+          setMessages((current) => {
+            storeGuestMessages(finalSessionId, current)
+            return current
+          })
+        }
 
         if (user) {
           refreshSessions()
