@@ -312,7 +312,10 @@ class OpenAICompatibleAIService:
         settings = get_settings()
         self._api_key = api_key or settings.ai_api_key
         self._base_url = (base_url or settings.ollama_base_url or "https://api.openai.com/v1").rstrip("/")
-        self._model = model or settings.ai_model or "gpt-4o-mini"
+        model_name = model or settings.ai_model or "gpt-4o-mini"
+        if "gemini" in model_name.lower() and model_name in {"gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash-exp"}:
+            model_name = "gemini-flash-lite-latest"
+        self._model = model_name
         self._timeout = timeout_seconds or settings.ai_timeout_seconds
         self._client = client
 

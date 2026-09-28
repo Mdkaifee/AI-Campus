@@ -227,8 +227,14 @@ class ChatService:
                 full_answer_chunks.append(token)
                 yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
         except Exception as exc:
-            logger.warning("Streaming AI failed, falling back to static answer: %s", type(exc).__name__)
-            fallback_answer = AI_UNAVAILABLE_ANSWER
+            logger.warning("Streaming AI failed, falling back to grounded knowledge: %s", type(exc).__name__)
+            if context:
+                primary = context[0]
+                fallback_answer = f"Here is the verified information from official DAVIET records regarding **{primary.title}**:\n\n{primary.content}"
+            elif location_data:
+                fallback_answer = f"**{location_data.get('name')}** is located in **{location_data.get('block', 'Main Campus')}** ({location_data.get('floor', 'Ground Floor')}). {location_data.get('description', '')}"
+            else:
+                fallback_answer = AI_UNAVAILABLE_ANSWER
             full_answer_chunks = [fallback_answer]
             yield f"data: {json.dumps({'type': 'token', 'content': fallback_answer})}\n\n"
 
@@ -285,8 +291,13 @@ class ChatService:
                 error_type="ai_provider_failure",
                 message=str(exc),
                 session_id=session_id,
-                provider="ollama",
+                provider="ai",
             )
+            if context:
+                primary = context[0]
+                return f"Here is the verified information from official DAVIET records regarding **{primary.title}**:\n\n{primary.content}", "grounded_knowledge", "knowledge_base"
+            elif location_data:
+                return f"**{location_data.get('name')}** is located in **{location_data.get('block', 'Main Campus')}** ({location_data.get('floor', 'Ground Floor')}). {location_data.get('description', '')}", "campus_map", "location_service"
             return AI_UNAVAILABLE_ANSWER, None, None
         except Exception as exc:  # noqa: BLE001
             logger.exception("Unexpected AI failure")
@@ -294,8 +305,13 @@ class ChatService:
                 error_type="ai_unexpected_failure",
                 message=type(exc).__name__,
                 session_id=session_id,
-                provider="ollama",
+                provider="ai",
             )
+            if context:
+                primary = context[0]
+                return f"Here is the verified information from official DAVIET records regarding **{primary.title}**:\n\n{primary.content}", "grounded_knowledge", "knowledge_base"
+            elif location_data:
+                return f"**{location_data.get('name')}** is located in **{location_data.get('block', 'Main Campus')}** ({location_data.get('floor', 'Ground Floor')}). {location_data.get('description', '')}", "campus_map", "location_service"
             return AI_UNAVAILABLE_ANSWER, None, None
 
     async def _safe_recent_turns(self, session_id: str) -> List[ChatTurn]:
