@@ -1,0 +1,48 @@
+services:
+  # -------------------------------------------------------------
+  # Backend: FastAPI Web Service
+  # -------------------------------------------------------------
+  - type: web
+    name: smart-campus-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DATABASE_NAME
+        value: Campus_AI
+      - key: MONGODB_URI
+        sync: false # Paste your MongoDB Atlas URI in Render dashboard
+      - key: CORS_ORIGINS
+        sync: false # Set to your Render Frontend URL, e.g. https://smart-campus-frontend.onrender.com
+      - key: AI_PROVIDER
+        value: openai # Cloud LLM (Groq / Gemini / OpenAI)
+      - key: OLLAMA_BASE_URL
+        value: https://api.groq.com/openai/v1 # Or https://generativelanguage.googleapis.com
+      - key: AI_MODEL
+        value: llama-3.3-70b-versatile # Or gemini-1.5-flash / gpt-4o-mini
+      - key: AI_API_KEY
+        sync: false # Paste your Cloud AI API Key in Render dashboard
+      - key: LOG_LEVEL
+        value: INFO
+
+  # -------------------------------------------------------------
+  # Frontend: React / Vite Static Site
+  # -------------------------------------------------------------
+  - type: web
+    name: smart-campus-frontend
+    runtime: static
+    plan: free
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false # Set to your Render Backend URL, e.g. https://smart-campus-backend.onrender.com
