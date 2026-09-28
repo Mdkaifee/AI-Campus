@@ -1,4 +1,4 @@
-"""Persist chat turns in MongoDB with per-user privacy isolation."""
+"""Persist chat turns in MongoDB with strict per-user privacy isolation."""
 
 from __future__ import annotations
 
@@ -54,6 +54,8 @@ class ChatRepository:
         query: Dict[str, Any] = {"session_id": session_id}
         if user_email:
             query["user_email"] = user_email
+        else:
+            query["user_email"] = None
 
         cursor = (
             collection.find(query)
@@ -73,6 +75,8 @@ class ChatRepository:
         query: Dict[str, Any] = {"session_id": session_id}
         if user_email:
             query["user_email"] = user_email
+        else:
+            query["user_email"] = None
 
         cursor = (
             collection.find(query)
@@ -88,13 +92,13 @@ class ChatRepository:
         if collection is None:
             return []
 
-        pipeline: List[Dict[str, Any]] = []
-        if user_email:
-            pipeline.append({"$match": {"user_email": user_email}})
-        else:
-            pipeline.append({"$match": {"user_email": None}})
+        # Guest (unauthenticated) users do NOT have shared persistent history.
+        # History is strictly private to authenticated student accounts.
+        if not user_email:
+            return []
 
-        pipeline.extend([
+        pipeline: List[Dict[str, Any]] = [
+            {"$match": {"user_email": user_email}},
             {"$sort": {"created_at": 1}},
             {
                 "$group": {
@@ -106,7 +110,7 @@ class ChatRepository:
             },
             {"$sort": {"updated_at": -1}},
             {"$limit": limit},
-        ])
+        ]
 
         sessions: List[Dict[str, Any]] = []
         async for row in collection.aggregate(pipeline):
@@ -128,6 +132,8 @@ class ChatRepository:
         query: Dict[str, Any] = {"session_id": session_id}
         if user_email:
             query["user_email"] = user_email
+        else:
+            query["user_email"] = None
 
         result = await collection.delete_many(query)
         return result.deleted_count > 0
