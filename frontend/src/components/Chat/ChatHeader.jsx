@@ -1,7 +1,9 @@
-import { Menu, Sun, Moon, ArrowLeft } from 'lucide-react'
+import { Menu, Sun, Moon, ArrowLeft, LogIn, User, LogOut } from 'lucide-react'
+import { useAuth } from '../../context/AuthContext'
 
 export default function ChatHeader({ theme, onToggleTheme, onToggleSidebar, onNewChat, onBackToHome }) {
   const isDark = theme === 'dark'
+  const { user, openAuthModal, logout } = useAuth()
 
   return (
     <header className="chat-header">
@@ -35,6 +37,34 @@ export default function ChatHeader({ theme, onToggleTheme, onToggleSidebar, onNe
       </div>
 
       <div className="chat-header__right">
+        {user ? (
+          <div className="header-user-badge" title={`Signed in as ${user.email}`}>
+            <div className="header-user-avatar">
+              {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+            </div>
+            <span className="header-user-name">{user.name}</span>
+            <button
+              type="button"
+              className="header-user-logout"
+              onClick={logout}
+              title="Sign Out"
+              aria-label="Sign Out"
+            >
+              <LogOut size={15} />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="header-signin-btn"
+            onClick={() => openAuthModal('login')}
+            title="Sign in to save private chat history"
+          >
+            <LogIn size={15} />
+            <span className="header-signin-text">Sign In</span>
+          </button>
+        )}
+
         <button
           type="button"
           className="header-theme-btn"

@@ -14,7 +14,12 @@ import {
   HelpCircle,
   Sparkles,
   ChevronRight,
+  ShieldCheck,
+  LogIn,
+  LogOut,
+  User,
 } from 'lucide-react'
+import { useAuth } from '../../context/AuthContext'
 
 // Default sample quick-access icons mapping if title matches keywords
 function getIconForTitle(title = '') {
@@ -38,6 +43,8 @@ export default function SessionSidebar({
   open,
   onClose,
 }) {
+  const { user, openAuthModal, logout } = useAuth()
+
   return (
     <aside className={`sidebar ${open ? 'sidebar--open' : ''}`}>
       {/* Brand Header with Graduation Cap */}
@@ -61,9 +68,13 @@ export default function SessionSidebar({
       <div className="sidebar__section-header">
         <div className="sidebar__section-left">
           <Clock size={15} strokeWidth={2.2} className="sidebar__section-clock" />
-          <span className="sidebar__section-title">Recent Conversations</span>
+          <span className="sidebar__section-title">
+            {user ? 'My Private Chats' : 'Recent Conversations'}
+          </span>
         </div>
-        <ChevronRight size={15} className="sidebar__section-chevron" />
+        <div className="sidebar__privacy-indicator" title="Your chats are isolated to your student account">
+          <ShieldCheck size={14} />
+        </div>
       </div>
 
       {/* Session History List */}
@@ -119,30 +130,57 @@ export default function SessionSidebar({
         })}
       </nav>
 
-      {/* Bottom Utility Links */}
-      <div className="sidebar__bottom-tools">
-        <button type="button" className="sidebar__tool-btn">
-          <Settings size={17} strokeWidth={1.9} />
-          <span>Settings</span>
-        </button>
-        <button type="button" className="sidebar__tool-btn">
-          <HelpCircle size={17} strokeWidth={1.9} />
-          <span>Help &amp; Information</span>
-        </button>
-      </div>
+      {/* Bottom Utility / Privacy Callout */}
+      {!user ? (
+        <div className="sidebar__guest-banner">
+          <div className="sidebar__guest-text">
+            <span className="sidebar__guest-title">Save your history</span>
+            <span className="sidebar__guest-sub">Sign in to sync your chats securely</span>
+          </div>
+          <button
+            type="button"
+            className="sidebar__guest-btn"
+            onClick={() => openAuthModal('login')}
+          >
+            <LogIn size={14} />
+            <span>Sign In</span>
+          </button>
+        </div>
+      ) : null}
 
       {/* Footer Profile / Status Badge */}
       <div className="sidebar__footer">
-        <div className="sidebar__status-profile">
-          <div className="sidebar__status-dot-pulse" />
-          <div className="sidebar__status-meta">
-            <span className="sidebar__status-name">DAVIET AI</span>
-            <span className="sidebar__status-online">Online</span>
+        {user ? (
+          <div className="sidebar__user-profile">
+            <div className="sidebar__user-avatar">
+              {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+            </div>
+            <div className="sidebar__user-meta">
+              <span className="sidebar__user-name">{user.name}</span>
+              <span className="sidebar__user-email">{user.email}</span>
+            </div>
+            <button
+              type="button"
+              className="sidebar__user-logout"
+              onClick={logout}
+              title="Sign Out"
+              aria-label="Sign Out"
+            >
+              <LogOut size={16} />
+            </button>
           </div>
-        </div>
-        <div className="sidebar__footer-spark-glow">
-          <Sparkles size={16} strokeWidth={2} />
-        </div>
+        ) : (
+          <div className="sidebar__status-profile">
+            <div className="sidebar__status-dot-pulse" />
+            <div className="sidebar__status-meta">
+              <span className="sidebar__status-name">DAVIET AI</span>
+              <span className="sidebar__status-online">Online (Guest)</span>
+            </div>
+            <div className="sidebar__footer-spark-glow">
+              <Sparkles size={16} strokeWidth={2} />
+            </div>
+          </div>
+        )}
       </div>
     </aside>
   )
