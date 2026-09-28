@@ -25,6 +25,10 @@ export function useChat() {
   }, [])
 
   const refreshSessions = useCallback(async () => {
+    if (!user) {
+      setSessions([])
+      return
+    }
     setSessionsLoading(true)
     try {
       const rows = await listSessions()
@@ -34,7 +38,7 @@ export function useChat() {
     } finally {
       setSessionsLoading(false)
     }
-  }, [])
+  }, [user])
 
   const loadSession = useCallback(
     async (id) => {
@@ -95,8 +99,15 @@ export function useChat() {
   useEffect(() => {
     let active = true
     startNewChat()
-    setSessionsLoading(true)
 
+    if (!user) {
+      // Guest mode: zero persistent history across browsers / profiles
+      setSessions([])
+      setSessionsLoading(false)
+      return
+    }
+
+    setSessionsLoading(true)
     listSessions()
       .then((rows) => {
         if (!active) return
@@ -144,7 +155,6 @@ export function useChat() {
       activeControllerRef.current = controller
 
       const currentSessionId = sessionId
-      // Mark the current target so any in-flight loadSession knows to yield
       activeTargetIdRef.current = currentSessionId
 
       setError('')
@@ -203,7 +213,9 @@ export function useChat() {
           { signal: controller.signal },
         )
 
-        refreshSessions()
+        if (user) {
+          refreshSessions()
+        }
       } catch (err) {
         if (err.name === 'AbortError') return
         setError(err.message || 'Something went wrong while processing your question. Please try again.')
@@ -211,7 +223,7 @@ export function useChat() {
         setLoading(false)
       }
     },
-    [cancelActiveRequest, loading, refreshSessions, sessionId],
+    [cancelActiveRequest, loading, refreshSessions, sessionId, user],
   )
 
   return {
