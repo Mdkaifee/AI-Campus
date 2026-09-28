@@ -25,6 +25,23 @@ from app.services.web_retrieval_service import WebRetrievalService
 
 logger = get_logger(__name__)
 
+GREETING_WORDS = {
+    "hi", "hello", "hey", "namaste", "hola", "greetings",
+    "good morning", "good afternoon", "good evening",
+    "hi there", "hello there", "hy", "helo"
+}
+
+GREETING_ANSWER = (
+    "Hello! 👋 I am the DAVIET Smart Campus AI Assistant. How can I help you today? "
+    "Feel free to ask me anything about admissions, courses & fee structures, departments, library timings, campus navigation, hostels, or student services!"
+)
+
+
+def _is_greeting(message: str) -> bool:
+    import re
+    cleaned = re.sub(r"[^\w\s]", "", message.strip().lower())
+    return cleaned in GREETING_WORDS
+
 
 class ChatService:
     def __init__(
@@ -45,6 +62,19 @@ class ChatService:
 
     async def ask(self, message: str, session_id: Optional[str] = None) -> ChatTurn:
         session = session_id.strip() if session_id and session_id.strip() else str(uuid.uuid4())
+
+        if _is_greeting(message):
+            turn = ChatTurn(
+                session_id=session,
+                user_message=message,
+                assistant_message=GREETING_ANSWER,
+                sources=[],
+                location=None,
+                provider="rules",
+                model="greeting",
+            )
+            await self._safe_save_turn(turn)
+            return turn
 
         # Load recent conversational history to preserve multi-turn context
         recent = await self._safe_recent_turns(session)
@@ -102,6 +132,30 @@ class ChatService:
 
     async def ask_stream(self, message: str, session_id: Optional[str] = None):
         session = session_id.strip() if session_id and session_id.strip() else str(uuid.uuid4())
+
+        import json
+
+        if _is_greeting(message):
+            metadata_event = {
+                "type": "metadata",
+                "session_id": session,
+                "sources": [],
+                "location": None,
+            }
+            yield f"data: {json.dumps(metadata_event)}\n\n"
+            yield f"data: {json.dumps({'type': 'token', 'content': GREETING_ANSWER})}\n\n"
+            turn = ChatTurn(
+                session_id=session,
+                user_message=message,
+                assistant_message=GREETING_ANSWER,
+                sources=[],
+                location=None,
+                provider="rules",
+                model="greeting",
+            )
+            await self._safe_save_turn(turn)
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+            return
 
         recent = await self._safe_recent_turns(session)
         conversation = [
