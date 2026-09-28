@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { deleteSession, getSession, listSessions, sendMessageStream } from '../services/api'
 import { getStoredSessionId, storeSessionId } from '../utils/session'
-
+import { useAuth } from '../context/AuthContext'
 
 export function useChat() {
+  const { user, token } = useAuth()
   const [sessionId, setSessionId] = useState(() => getStoredSessionId())
   const [messages, setMessages] = useState([])
   const [sessions, setSessions] = useState([])
@@ -80,31 +81,6 @@ export function useChat() {
     [cancelActiveRequest],
   )
 
-  // On initial mount: load session list AND automatically restore previous chat messages if sessionId is stored
-  useEffect(() => {
-    let active = true
-    const savedId = getStoredSessionId()
-
-    listSessions()
-      .then((rows) => {
-        if (!active) return
-        setSessions(rows)
-
-        // If user already had a saved session, load its messages
-        const targetId = savedId || (rows.length > 0 ? rows[0].session_id : null)
-        if (targetId) {
-          loadSession(targetId)
-        }
-      })
-      .catch(() => {
-        // Degraded mode
-      })
-
-    return () => {
-      active = false
-    }
-  }, [loadSession])
-
   const startNewChat = useCallback(() => {
     cancelActiveRequest()
     activeTargetIdRef.current = null
@@ -114,6 +90,33 @@ export function useChat() {
     setError('')
     setLoading(false)
   }, [cancelActiveRequest])
+
+  // When user changes (login / logout / switch account), clear and reload sessions for that user
+  useEffect(() => {
+    let active = true
+    startNewChat()
+    setSessionsLoading(true)
+
+    listSessions()
+      .then((rows) => {
+        if (!active) return
+        setSessions(rows)
+        if (rows.length > 0) {
+          loadSession(rows[0].session_id)
+        }
+      })
+      .catch(() => {
+        if (!active) return
+        setSessions([])
+      })
+      .finally(() => {
+        if (active) setSessionsLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [token, user?.email])
 
   const removeSession = useCallback(
     async (id, event) => {
@@ -156,8 +159,6 @@ export function useChat() {
             message: trimmed,
             sessionId: currentSessionId,
             onMetadata: (meta) => {
-              // Only drop if we've already moved to a completely different session
-              // (i.e. user clicked another session AFTER this send started)
               const currentTarget = activeTargetIdRef.current
               if (
                 currentTarget !== null &&
@@ -184,7 +185,7 @@ export function useChat() {
                 ])
               }
             },
-            onToken: (token) => {
+            onToken: (tokenChunk) => {
               setMessages((current) => {
                 if (current.length === 0) return current
                 const lastIdx = current.length - 1
@@ -193,7 +194,7 @@ export function useChat() {
                 const updated = [...current]
                 updated[lastIdx] = {
                   ...lastMsg,
-                  content: lastMsg.content + token,
+                  content: lastMsg.content + tokenChunk,
                 }
                 return updated
               })
@@ -228,4 +229,3 @@ export function useChat() {
     clearError: () => setError(''),
   }
 }
-

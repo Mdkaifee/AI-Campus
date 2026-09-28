@@ -17,8 +17,12 @@ import {
   Users,
   GraduationCap,
   ExternalLink,
+  LogIn,
+  LogOut,
+  UserCheck,
 } from 'lucide-react'
 import campusHeroImg from '../assets/daviet_campus_hero_transparent.png'
+import { useAuth } from '../context/AuthContext'
 
 const EXPLORE_TOPICS = [
   {
@@ -97,6 +101,7 @@ const EXPLORE_TOPICS = [
 
 export default function LandingPage({ onOpenChat, theme, onToggleTheme }) {
   const isDark = theme === 'dark'
+  const { user, openAuthModal, logout } = useAuth()
 
   return (
     <div className="landing-page">
@@ -130,6 +135,47 @@ export default function LandingPage({ onOpenChat, theme, onToggleTheme }) {
               {isDark ? <Sun size={18} /> : <Moon size={18} />}
             </button>
 
+            {user ? (
+              <div className="landing-user-profile">
+                <div className="landing-user-chip" title={user.email}>
+                  <div className="landing-user-avatar">
+                    {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                  </div>
+                  <div className="landing-user-details">
+                    <span className="landing-user-name">{user.name}</span>
+                    <span className="landing-user-role">Student</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="landing-logout-btn"
+                  onClick={logout}
+                  title="Sign out of account"
+                >
+                  <LogOut size={16} />
+                  <span className="landing-logout-text">Sign Out</span>
+                </button>
+              </div>
+            ) : (
+              <div className="landing-auth-buttons">
+                <button
+                  type="button"
+                  className="landing-signin-btn"
+                  onClick={() => openAuthModal('login')}
+                >
+                  <LogIn size={15} />
+                  <span>Sign In</span>
+                </button>
+                <button
+                  type="button"
+                  className="landing-signup-btn"
+                  onClick={() => openAuthModal('signup')}
+                >
+                  <span>Sign Up</span>
+                </button>
+              </div>
+            )}
+
             <button
               type="button"
               className="landing-cta-btn"
@@ -159,7 +205,11 @@ export default function LandingPage({ onOpenChat, theme, onToggleTheme }) {
               </h1>
 
               <p className="landing-hero__desc">
-                Welcome to the next-generation DAVIET Smart Campus Portal. Explore programs, fee structures, admissions, and get instant verified answers from our AI Assistant 24/7.
+                {user ? (
+                  <>Welcome back, <strong>{user.name}</strong>! Your chat sessions and questions are securely saved to your student profile. Ask about courses, exams, fees, or faculty anytime.</>
+                ) : (
+                  <>Welcome to the next-generation DAVIET Smart Campus Portal. Explore programs, fee structures, admissions, and get instant verified answers from our AI Assistant 24/7.</>
+                )}
               </p>
 
               <div className="landing-hero__actions">
@@ -172,6 +222,18 @@ export default function LandingPage({ onOpenChat, theme, onToggleTheme }) {
                   <span>Chat with Campus AI</span>
                   <ArrowRight size={16} />
                 </button>
+
+                {!user && (
+                  <button
+                    type="button"
+                    className="landing-btn-secondary"
+                    onClick={() => openAuthModal('signup')}
+                  >
+                    <UserCheck size={16} />
+                    <span>Create Free Account</span>
+                  </button>
+                )}
+
                 <a href="#explore" className="landing-btn-secondary">
                   <span>Explore Academics</span>
                 </a>

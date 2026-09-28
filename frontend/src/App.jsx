@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import LandingPage from './pages/LandingPage.jsx'
 import ChatPage from './pages/ChatPage.jsx'
+import AuthModal from './components/Auth/AuthModal.jsx'
+import { AuthProvider } from './context/AuthContext.jsx'
 
-function App() {
+function MainContent() {
   const [activeView, setActiveView] = useState('landing') // 'landing' | 'chat'
   const [initialPrompt, setInitialPrompt] = useState('')
   const [theme, setTheme] = useState(() => {
@@ -30,23 +32,32 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  if (activeView === 'chat') {
-    return (
-      <ChatPage
-        onBackToHome={handleBackToHome}
-        initialPrompt={initialPrompt}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-      />
-    )
-  }
-
   return (
-    <LandingPage
-      onOpenChat={handleOpenChat}
-      theme={theme}
-      onToggleTheme={toggleTheme}
-    />
+    <>
+      <AuthModal />
+      {activeView === 'chat' ? (
+        <ChatPage
+          onBackToHome={handleBackToHome}
+          initialPrompt={initialPrompt}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
+      ) : (
+        <LandingPage
+          onOpenChat={handleOpenChat}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
+      )}
+    </>
+  )
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <MainContent />
+    </AuthProvider>
   )
 }
 
