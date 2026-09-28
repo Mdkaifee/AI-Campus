@@ -511,7 +511,6 @@ class OpenAICompatibleAIService:
                 ],
                 "generationConfig": {
                     "temperature": 0.3,
-                    "thinkingConfig": {"thinkingBudget": 0},
                 },
             }
             max_retries = 4
