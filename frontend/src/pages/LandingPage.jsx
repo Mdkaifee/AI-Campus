@@ -117,9 +117,10 @@ export default function LandingPage({ onOpenChat, theme, onToggleTheme }) {
           </div>
 
           <nav className="landing-nav-links">
-            <a href="#about" className="landing-nav-link">About</a>
+            
             <a href="#explore" className="landing-nav-link">Academics</a>
             <a href="#facilities" className="landing-nav-link">Facilities</a>
+            <a href="#about" className="landing-nav-link">About</a>
             <a href="https://davietjal.org" target="_blank" rel="noopener noreferrer" className="landing-nav-link external">
               Official Portal <ExternalLink size={13} />
             </a>
