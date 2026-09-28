@@ -1,24 +1,50 @@
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/$/, '')
 
+const TOKEN_KEY = 'daviet_auth_token'
+
+export function getAuthToken() {
+  return localStorage.getItem(TOKEN_KEY) || ''
+}
+
+export function setAuthToken(token) {
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token)
+  } else {
+    localStorage.removeItem(TOKEN_KEY)
+  }
+}
+
+export function removeAuthToken() {
+  localStorage.removeItem(TOKEN_KEY)
+}
+
 async function request(path, options = {}) {
   let response
+  const token = getAuthToken()
+  const defaultHeaders = {
+    'Content-Type': 'application/json',
+  }
+  if (token) {
+    defaultHeaders['Authorization'] = `Bearer ${token}`
+  }
+
   try {
     response = await fetch(`${API_BASE}${path}`, {
+      ...options,
       headers: {
-        'Content-Type': 'application/json',
+        ...defaultHeaders,
         ...(options.headers || {}),
       },
-      ...options,
     })
   } catch (err) {
     if (err.name === 'AbortError') {
       throw err
     }
-    throw new Error('Something went wrong while processing your question. Please try again.')
+    throw new Error('Something went wrong while communicating with the server. Please try again.')
   }
 
   if (!response.ok) {
-    let detail = 'Something went wrong while processing your question. Please try again.'
+    let detail = 'Something went wrong while processing your request.'
     try {
       const payload = await response.json()
       if (typeof payload?.detail === 'string') {
@@ -35,6 +61,28 @@ async function request(path, options = {}) {
   return response.json()
 }
 
+// ---------------- Authentication APIs ----------------
+
+export function authSignUp({ name, email, password }) {
+  return request('/api/auth/signup', {
+    method: 'POST',
+    body: JSON.stringify({ name, email, password }),
+  })
+}
+
+export function authLogin({ email, password }) {
+  return request('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  })
+}
+
+export function authGetMe() {
+  return request('/api/auth/me')
+}
+
+// ---------------- Chat APIs ----------------
+
 export function sendMessage({ message, sessionId }, options = {}) {
   const body = { message }
   if (sessionId) body.session_id = sessionId
@@ -49,15 +97,31 @@ export async function sendMessageStream({ message, sessionId, onMetadata, onToke
   const body = { message }
   if (sessionId) body.session_id = sessionId
 
+  const token = getAuthToken()
+  const headers = { 'Content-Type': 'application/json' }
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
   const response = await fetch(`${API_BASE}/api/chat/stream`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      ...headers,
+      ...(options.headers || {}),
+    },
     body: JSON.stringify(body),
     ...options,
   })
 
   if (!response.ok) {
-    throw new Error('Something went wrong while processing your question. Please try again.')
+    let detail = 'Something went wrong while processing your question. Please try again.'
+    try {
+      const payload = await response.json()
+      if (typeof payload?.detail === 'string') detail = payload.detail
+    } catch {
+      // keep default
+    }
+    throw new Error(detail)
   }
 
   const reader = response.body.getReader()
@@ -77,7 +141,6 @@ export async function sendMessageStream({ message, sessionId, onMetadata, onToke
     buffer = parts.pop() ?? ''
 
     for (const part of parts) {
-      // Each part may have multiple lines; find the "data: " line
       for (const line of part.split('\n')) {
         const trimmed = line.trim()
         if (!trimmed.startsWith('data: ')) continue
@@ -98,7 +161,6 @@ export async function sendMessageStream({ message, sessionId, onMetadata, onToke
   }
 }
 
-
 export function listSessions(options = {}) {
   return request('/api/chat/sessions', options)
 }
@@ -117,4 +179,3 @@ export function deleteSession(sessionId, options = {}) {
 export function checkHealth(options = {}) {
   return request('/api/health', options)
 }
-
