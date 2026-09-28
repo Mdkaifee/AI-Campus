@@ -4,6 +4,15 @@ import ChatPage from './pages/ChatPage.jsx'
 import AuthModal from './components/Auth/AuthModal.jsx'
 import { AuthProvider, useAuth } from './context/AuthContext.jsx'
 
+function getScheduledTheme() {
+  const hours = new Date().getHours()
+  // Dark mode turns ON after 6:00 PM (18:00) and turns OFF after 5:00 AM (05:00)
+  if (hours >= 18 || hours < 5) {
+    return 'dark'
+  }
+  return 'light'
+}
+
 function MainRouter() {
   const { user, openAuthModal } = useAuth()
   const [activeRoute, setActiveRoute] = useState(() => {
@@ -16,14 +25,48 @@ function MainRouter() {
     return path === '/guest'
   })
   const [initialPrompt, setInitialPrompt] = useState('')
-  const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('daviet_theme') || 'light'
+
+  const [manualOverride, setManualOverride] = useState(() => {
+    return sessionStorage.getItem('daviet_theme_manual') === 'true'
   })
 
+  const [theme, setTheme] = useState(() => {
+    const isManual = sessionStorage.getItem('daviet_theme_manual') === 'true'
+    if (isManual) {
+      return localStorage.getItem('daviet_theme') || getScheduledTheme()
+    }
+    return getScheduledTheme()
+  })
+
+  // Synchronize document attribute whenever theme changes
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('daviet_theme', theme)
   }, [theme])
+
+  // Periodic and visibility-based auto theme check (6 PM - 5 AM)
+  useEffect(() => {
+    function checkSchedule() {
+      if (!manualOverride) {
+        const scheduled = getScheduledTheme()
+        setTheme((current) => (current !== scheduled ? scheduled : current))
+      }
+    }
+
+    checkSchedule()
+    const timer = setInterval(checkSchedule, 10000) // check every 10s
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        checkSchedule()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [manualOverride])
 
   // Handle direct navigation or back/forward buttons
   useEffect(() => {
@@ -60,6 +103,8 @@ function MainRouter() {
   }, [openAuthModal])
 
   function toggleTheme() {
+    setManualOverride(true)
+    sessionStorage.setItem('daviet_theme_manual', 'true')
     setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))
   }
 
