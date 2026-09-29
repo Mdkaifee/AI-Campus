@@ -43,6 +43,23 @@ def _is_greeting(message: str) -> bool:
     return cleaned in GREETING_WORDS
 
 
+def _is_follow_up_question(message: str) -> bool:
+    """Use history for short contextual follow-ups, not for new questions."""
+    import re
+
+    words = re.findall(r"[a-z0-9']+", message.lower())
+    if len(words) > 5:
+        return False
+    markers = {
+        "and", "also", "too", "there", "it", "that", "this", "its",
+        "iska", "iski", "iske", "uska", "uski", "uske",
+    }
+    return bool(markers.intersection(words)) or any(
+        phrase in message.lower()
+        for phrase in ("that one", "this one", "same course", "same branch", "what about")
+    )
+
+
 class ChatService:
     def __init__(
         self,
@@ -82,6 +99,7 @@ class ChatService:
         conversation = [
             (turn.user_message, turn.assistant_message) for turn in recent[-4:]
         ]
+        prompt_conversation = conversation if _is_follow_up_question(message) else []
 
         # Check for campus location match (fuzzy typos like 'ug blok', context follow-ups)
         matched_loc = self._location_service.match_location(message, conversation_context=conversation)
@@ -92,7 +110,7 @@ class ChatService:
 
         # Retrieve knowledge with conversation context expansion & dynamic items
         context = self._retrieval.retrieve(
-            message, limit=3, conversation=conversation
+            message, limit=3, conversation=prompt_conversation
         )
         # Merge dynamic catalog items if not already present in retrieved context
         existing_ids = {item.id for item in context}
@@ -114,7 +132,7 @@ class ChatService:
         answer, provider, model = await self._generate_answer(
             message=message,
             context=context,
-            conversation=conversation,
+            conversation=prompt_conversation,
             location_data=location_data,
             session_id=session,
         )
@@ -164,6 +182,7 @@ class ChatService:
         conversation = [
             (turn.user_message, turn.assistant_message) for turn in recent[-4:]
         ]
+        prompt_conversation = conversation if _is_follow_up_question(message) else []
 
         matched_loc = self._location_service.match_location(message, conversation_context=conversation)
         location_data = matched_loc.to_dict() if matched_loc else None
@@ -172,7 +191,7 @@ class ChatService:
         dynamic_items = await self._web_retrieval.fetch_dynamic_items(message)
 
         context = self._retrieval.retrieve(
-            message, limit=3, conversation=conversation
+            message, limit=3, conversation=prompt_conversation
         )
         existing_ids = {item.id for item in context}
         for item in dynamic_items:
@@ -224,7 +243,7 @@ class ChatService:
             async for token in self._ai.generate_stream(
                 question=message,
                 context=context,
-                conversation=conversation,
+                conversation=prompt_conversation,
                 location_meta=location_data,
             ):
                 full_answer_chunks.append(token)

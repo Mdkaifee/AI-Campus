@@ -57,9 +57,11 @@ class StubAIService(AIService):
         self.answer = answer
         self.fail = False
         self.calls = 0
+        self.conversations = []
 
     async def generate_response(self, question: str, context, conversation=None, **kwargs) -> AIResult:
         self.calls += 1
+        self.conversations.append(list(conversation or []))
         if self.fail:
             raise AIProviderError("offline")
         return AIResult(answer=self.answer, provider="ollama", model="llama3.2")
@@ -161,3 +163,4 @@ async def test_session_id_is_preserved(chat_stack):
     assert history.status_code == 200
     assert len(history.json()["turns"]) == 2
     assert all(turn.session_id == session_id for turn in chat_stack["repo"].turns)
+    assert chat_stack["ai"].conversations[1] == []
